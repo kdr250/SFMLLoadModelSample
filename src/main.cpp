@@ -12,11 +12,7 @@ int main()
         return -1;
     }
 
-    sf::Texture texture;
-    texture.create(window.getSize().x, window.getSize().y);
-
-    sf::Sprite sprite;
-    sprite.setTexture(texture);
+    sf::RectangleShape rect {sf::Vector2f(window.getSize())};
 
     while (window.isOpen())
     {
@@ -38,7 +34,7 @@ int main()
 
         window.clear();
 
-        window.draw(sprite, &shader);
+        window.draw(rect, &shader);
 
         window.display();
     }
