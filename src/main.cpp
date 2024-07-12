@@ -1,54 +1,122 @@
+#include <GL/glew.h>
 #include <SFML/Graphics.hpp>
+#include <SFML/OpenGL.hpp>
+#include <glm/glm.hpp>
+#include <glm/gtc/type_ptr.hpp>
 #include <iostream>
 
-constexpr int WINDOW_WIDTH  = 1280;
-constexpr int WINDOW_HEIGHT = 768;
+struct Vertex
+{
+    glm::vec3 position;
+    glm::vec3 color;
+    glm::vec2 texCoord;
+};
+
+Vertex vertices[] = {
+    // positions          // texture coords
+    {{0.5f, 0.5f, 0.0f}, {1.0f, 0.0f, 0.0f}, {1.0f, 1.0f}},    // top right
+    {{0.5f, -0.5f, 0.0f}, {1.0f, 0.0f, 0.0f}, {1.0f, 0.0f}},   // bottom right
+    {{-0.5f, -0.5f, 0.0f}, {1.0f, 0.0f, 0.0f}, {0.0f, 0.0f}},  // bottom left
+    {{-0.5f, 0.5f, 0.0f}, {1.0f, 0.0f, 0.0f}, {0.0f, 1.0f}}    // top left
+};
+
+std::vector<unsigned int> indices = {0, 1, 2, 2, 3, 0};
 
 int main()
 {
-    sf::RenderWindow window(sf::VideoMode(WINDOW_WIDTH, WINDOW_HEIGHT),
-                            "Shader Smaple",
-                            sf::Style::Titlebar | sf::Style::Close);
+    sf::ContextSettings context;
+    context.depthBits = 24;
+
+    sf::RenderWindow window(sf::VideoMode(800, 600), "Window", sf::Style::Default, context);
+    window.setActive(true);
+
+    glewInit();
+    glewExperimental = GL_TRUE;
+
+    glEnable(GL_TEXTURE_2D);
+
+    sf::Image image;
+    if (!image.loadFromFile("resources/texture/texture.jpg"))
+    {
+        std::cerr << "failed to load texture image" << std::endl;
+        return -1;
+    }
+    image.flipVertically();
+
+    sf::Texture texture;
+    if (!texture.loadFromImage(image))
+    {
+        std::cerr << "failed to load texture" << std::endl;
+        return -1;
+    }
 
     sf::Shader shader;
-    if (!shader.loadFromFile("resources/shader/shader.frag", sf::Shader::Fragment))
+    if (!shader.loadFromFile("resources/shader/vertex.vert", "resources/shader/fragment.frag"))
     {
         std::cerr << "failed to load shaders" << std::endl;
         return -1;
     }
+    shader.setUniform("ourTexture", texture);
 
-    sf::VertexArray vertices(sf::TriangleStrip, 3);
-    vertices[0].position = sf::Vector2f(WINDOW_WIDTH * 0.5f, WINDOW_HEIGHT * 0.2f);
-    vertices[0].color    = sf::Color::Red;
-    vertices[1].position = sf::Vector2f(WINDOW_WIDTH * 0.8f, WINDOW_HEIGHT * 0.8f);
-    vertices[1].color    = sf::Color::Green;
-    vertices[2].position = sf::Vector2f(WINDOW_WIDTH * 0.2f, WINDOW_HEIGHT * 0.8f);
-    vertices[2].color    = sf::Color::Blue;
+    glm::mat4 model = glm::mat4(1.0f);
+    glm::mat4 view = glm::lookAt(glm::vec3(2.0f, 2.0f, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+    glm::mat4 proj = glm::perspective(glm::radians(45.0f), window.getSize().x / (float)window.getSize().y, 0.1f, 10.0f);
+
+    sf::Glsl::Mat4 sfModel(glm::value_ptr(model));
+    sf::Glsl::Mat4 sfView(glm::value_ptr(view));
+    sf::Glsl::Mat4 sfProj(glm::value_ptr(proj));
+    shader.setUniform("model", sfModel);
+    shader.setUniform("view", sfView);
+    shader.setUniform("proj", sfProj);
+
+    sf::Shader::bind(&shader);
+
+    unsigned int VBO, VAO, EBO;
+    glGenVertexArrays(1, &VAO);
+    glGenBuffers(1, &VBO);
+    glGenBuffers(1, &EBO);
+
+    glBindVertexArray(VAO);
+    glBindBuffer(GL_ARRAY_BUFFER, VBO);
+
+    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices.size() * sizeof(unsigned int), indices.data(), GL_STATIC_DRAW);
+
+    // vertex positions
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)0);
+    // vertex color
+    glEnableVertexAttribArray(1);
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, color));
+    // vertex texture coords
+    glEnableVertexAttribArray(2);
+    glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, texCoord));
+
+    glBindVertexArray(0);
+
+    glViewport(0.f, 0.f, 800.f, 600.f);
+    glClearColor(0.f, 0.f, 0.f, 0.f);
 
     while (window.isOpen())
     {
         sf::Event event;
         while (window.pollEvent(event))
         {
-            switch (event.type)
+            if (event.type == sf::Event::Closed)
             {
-                case sf::Event::Closed:
-                    window.close();
-
-                case sf::Event::KeyPressed:
-                    if (event.key.code == sf::Keyboard::Escape)
-                    {
-                        window.close();
-                    }
+                window.close();
             }
         }
 
-        window.clear();
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-        window.draw(vertices, &shader);
+        // draw
+        glBindVertexArray(VAO);
+        glDrawElements(GL_TRIANGLES, static_cast<unsigned int>(indices.size()), GL_UNSIGNED_INT, 0);
+        glBindVertexArray(0);
 
         window.display();
     }
-
-    return 0;
 }

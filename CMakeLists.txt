@@ -8,6 +8,8 @@ endif()
 project(SfmlWithCMake VERSION 1.0)
 
 find_package(SFML COMPONENTS system window graphics CONFIG REQUIRED)
+find_package(GLEW REQUIRED)
+find_package(glm CONFIG REQUIRED)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED true)
@@ -22,9 +24,12 @@ add_executable(
 	SfmlWithCMake
 	${SOURCES}
 )
+
 target_link_libraries(
 	SfmlWithCMake PRIVATE
 	sfml-system sfml-network sfml-graphics sfml-window sfml-main
+	GLEW::GLEW
+	glm::glm
 )
 
 add_custom_command(
