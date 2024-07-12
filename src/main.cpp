@@ -58,9 +58,16 @@ int main()
     }
     shader.setUniform("ourTexture", texture);
 
-    glm::mat4 transform = glm::mat4(1.0f);
-    sf::Glsl::Mat4 sfTransform(glm::value_ptr(transform));
-    shader.setUniform("transform", sfTransform);
+    glm::mat4 model = glm::mat4(1.0f);
+    glm::mat4 view = glm::lookAt(glm::vec3(2.0f, 2.0f, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+    glm::mat4 proj = glm::perspective(glm::radians(45.0f), window.getSize().x / (float)window.getSize().y, 0.1f, 10.0f);
+
+    sf::Glsl::Mat4 sfModel(glm::value_ptr(model));
+    sf::Glsl::Mat4 sfView(glm::value_ptr(view));
+    sf::Glsl::Mat4 sfProj(glm::value_ptr(proj));
+    shader.setUniform("model", sfModel);
+    shader.setUniform("view", sfView);
+    shader.setUniform("proj", sfProj);
 
     sf::Shader::bind(&shader);
 
