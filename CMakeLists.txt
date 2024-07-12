@@ -10,6 +10,7 @@ project(SfmlWithCMake VERSION 1.0)
 find_package(SFML COMPONENTS system window graphics CONFIG REQUIRED)
 find_package(GLEW REQUIRED)
 find_package(glm CONFIG REQUIRED)
+find_package(tinyobjloader CONFIG REQUIRED)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED true)
@@ -30,6 +31,7 @@ target_link_libraries(
 	sfml-system sfml-network sfml-graphics sfml-window sfml-main
 	GLEW::GLEW
 	glm::glm
+	tinyobjloader::tinyobjloader
 )
 
 add_custom_command(
