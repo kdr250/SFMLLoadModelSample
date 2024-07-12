@@ -11,7 +11,7 @@ int main()
                             sf::Style::Titlebar | sf::Style::Close);
 
     sf::Shader shader;
-    if (!shader.loadFromFile("resources/shader/shader.frag", sf::Shader::Fragment))
+    if (!shader.loadFromFile("resources/shader/shader.vert", "resources/shader/shader.frag"))
     {
         std::cerr << "failed to load shaders" << std::endl;
         return -1;
