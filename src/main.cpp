@@ -5,13 +5,22 @@
 #include <glm/gtc/type_ptr.hpp>
 #include <iostream>
 
-float vertices[] = {
-    // positions          // texture coords
-    0.5f,  0.5f,  0.0f, 1.0f, 1.0f,  // top right
-    0.5f,  -0.5f, 0.0f, 1.0f, 0.0f,  // bottom right
-    -0.5f, -0.5f, 0.0f, 0.0f, 0.0f,  // bottom left
-    -0.5f, 0.5f,  0.0f, 0.0f, 1.0f   // top left
+struct Vertex
+{
+    glm::vec3 position;
+    glm::vec3 color;
+    glm::vec2 texCoord;
 };
+
+Vertex vertices[] = {
+    // positions          // texture coords
+    {{0.5f, 0.5f, 0.0f}, {1.0f, 0.0f, 0.0f}, {1.0f, 1.0f}},    // top right
+    {{0.5f, -0.5f, 0.0f}, {1.0f, 0.0f, 0.0f}, {1.0f, 0.0f}},   // bottom right
+    {{-0.5f, -0.5f, 0.0f}, {1.0f, 0.0f, 0.0f}, {0.0f, 0.0f}},  // bottom left
+    {{-0.5f, 0.5f, 0.0f}, {1.0f, 0.0f, 0.0f}, {0.0f, 1.0f}}    // top left
+};
+
+std::vector<unsigned int> indices = {0, 1, 2, 2, 3, 0};
 
 int main()
 {
@@ -55,18 +64,30 @@ int main()
 
     sf::Shader::bind(&shader);
 
-    unsigned int VBO;
+    unsigned int VBO, VAO, EBO;
+    glGenVertexArrays(1, &VAO);
     glGenBuffers(1, &VBO);
+    glGenBuffers(1, &EBO);
+
+    glBindVertexArray(VAO);
     glBindBuffer(GL_ARRAY_BUFFER, VBO);
+
     glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
 
-    unsigned int VAO;
-    glGenVertexArrays(1, &VAO);
-    glBindVertexArray(VAO);
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)(0 * sizeof(float)));
-    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)(3 * sizeof(float)));
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices.size() * sizeof(unsigned int), indices.data(), GL_STATIC_DRAW);
+
+    // vertex positions
     glEnableVertexAttribArray(0);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)0);
+    // vertex color
     glEnableVertexAttribArray(1);
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, color));
+    // vertex texture coords
+    glEnableVertexAttribArray(2);
+    glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, texCoord));
+
+    glBindVertexArray(0);
 
     glViewport(0.f, 0.f, 800.f, 600.f);
     glClearColor(0.f, 0.f, 0.f, 0.f);
@@ -83,7 +104,12 @@ int main()
         }
 
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-        glDrawArrays(GL_QUADS, 0, 4);
+
+        // draw
+        glBindVertexArray(VAO);
+        glDrawElements(GL_TRIANGLES, static_cast<unsigned int>(indices.size()), GL_UNSIGNED_INT, 0);
+        glBindVertexArray(0);
+
         window.display();
     }
 }
