@@ -1,26 +1,45 @@
 #include <GL/glew.h>
 #include <SFML/Graphics.hpp>
 #include <SFML/OpenGL.hpp>
+#define GLM_ENABLE_EXPERIMENTAL
 #include <glm/glm.hpp>
 #include <glm/gtc/type_ptr.hpp>
+#include <glm/gtx/hash.hpp>
+#define TINYOBJLOADER_IMPLEMENTATION
+#include <tiny_obj_loader.h>
 #include <iostream>
+#include <string>
+#include <unordered_map>
+#include <vector>
 
 struct Vertex
 {
     glm::vec3 position;
     glm::vec3 color;
     glm::vec2 texCoord;
+
+    bool operator==(const Vertex& other) const
+    {
+        return position == other.position && color == other.color && texCoord == other.texCoord;
+    }
 };
 
-Vertex vertices[] = {
-    // positions          // texture coords
-    {{0.5f, 0.5f, 0.0f}, {1.0f, 0.0f, 0.0f}, {1.0f, 1.0f}},    // top right
-    {{0.5f, -0.5f, 0.0f}, {1.0f, 0.0f, 0.0f}, {1.0f, 0.0f}},   // bottom right
-    {{-0.5f, -0.5f, 0.0f}, {1.0f, 0.0f, 0.0f}, {0.0f, 0.0f}},  // bottom left
-    {{-0.5f, 0.5f, 0.0f}, {1.0f, 0.0f, 0.0f}, {0.0f, 1.0f}}    // top left
-};
+namespace std
+{
+    template<>
+    struct hash<Vertex>
+    {
+        size_t operator()(Vertex const& vertex) const
+        {
+            return ((hash<glm::vec3>()(vertex.position) ^ (hash<glm::vec3>()(vertex.color) << 1)) >> 1)
+                   ^ (hash<glm::vec2>()(vertex.texCoord) << 1);
+        }
+    };
+}  // namespace std
 
-std::vector<unsigned int> indices = {0, 1, 2, 2, 3, 0};
+std::vector<Vertex> vertices;
+
+std::vector<unsigned int> indices;
 
 int main()
 {
@@ -36,7 +55,7 @@ int main()
     glEnable(GL_TEXTURE_2D);
 
     sf::Image image;
-    if (!image.loadFromFile("resources/texture/texture.jpg"))
+    if (!image.loadFromFile("resources/texture/viking_room.png"))
     {
         std::cerr << "failed to load texture image" << std::endl;
         return -1;
@@ -71,6 +90,44 @@ int main()
 
     sf::Shader::bind(&shader);
 
+    // load model
+    tinyobj::attrib_t attrib;
+    std::vector<tinyobj::shape_t> shapes;
+    std::vector<tinyobj::material_t> materials;
+    std::string warn, err;
+
+    if (!tinyobj::LoadObj(&attrib, &shapes, &materials, &warn, &err, "resources/model/viking_room.obj"))
+    {
+        std::cerr << "failed to load obj" << std::endl;
+        return -1;
+    }
+
+    std::unordered_map<Vertex, unsigned int> uniqueVertices;
+
+    for (const auto& shape : shapes)
+    {
+        for (const auto& index : shape.mesh.indices)
+        {
+            Vertex vertex {};
+            vertex.position = {attrib.vertices[3 * index.vertex_index + 0],
+                               attrib.vertices[3 * index.vertex_index + 1],
+                               attrib.vertices[3 * index.vertex_index + 2]};
+            vertex.texCoord = {attrib.texcoords[2 * index.texcoord_index + 0],
+                               attrib.texcoords[2 * index.texcoord_index + 1]};
+            vertex.color    = {1.0f, 1.0f, 1.0f};
+
+            if (uniqueVertices.count(vertex) == 0)
+            {
+                uniqueVertices[vertex] = static_cast<unsigned int>(vertices.size());
+                vertices.emplace_back(vertex);
+            }
+            indices.emplace_back(uniqueVertices[vertex]);
+        }
+    }
+
+    std::cout << "Vertices size : " << vertices.size() << std::endl;
+    std::cout << "Indices size  : " << indices.size() << std::endl;
+
     unsigned int VBO, VAO, EBO;
     glGenVertexArrays(1, &VAO);
     glGenBuffers(1, &VBO);
@@ -79,7 +136,7 @@ int main()
     glBindVertexArray(VAO);
     glBindBuffer(GL_ARRAY_BUFFER, VBO);
 
-    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(Vertex), vertices.data(), GL_STATIC_DRAW);
 
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
     glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices.size() * sizeof(unsigned int), indices.data(), GL_STATIC_DRAW);
