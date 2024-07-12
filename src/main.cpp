@@ -1,12 +1,15 @@
 #include <GL/glew.h>
 #include <SFML/Graphics.hpp>
 #include <SFML/OpenGL.hpp>
+#define GLM_ENABLE_EXPERIMENTAL
 #include <glm/glm.hpp>
 #include <glm/gtc/type_ptr.hpp>
+#include <glm/gtx/hash.hpp>
 #define TINYOBJLOADER_IMPLEMENTATION
 #include <tiny_obj_loader.h>
 #include <iostream>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 struct Vertex
@@ -14,7 +17,25 @@ struct Vertex
     glm::vec3 position;
     glm::vec3 color;
     glm::vec2 texCoord;
+
+    bool operator==(const Vertex& other) const
+    {
+        return position == other.position && color == other.color && texCoord == other.texCoord;
+    }
 };
+
+namespace std
+{
+    template<>
+    struct hash<Vertex>
+    {
+        size_t operator()(Vertex const& vertex) const
+        {
+            return ((hash<glm::vec3>()(vertex.position) ^ (hash<glm::vec3>()(vertex.color) << 1)) >> 1)
+                   ^ (hash<glm::vec2>()(vertex.texCoord) << 1);
+        }
+    };
+}  // namespace std
 
 std::vector<Vertex> vertices;
 
@@ -81,6 +102,8 @@ int main()
         return -1;
     }
 
+    std::unordered_map<Vertex, unsigned int> uniqueVertices;
+
     for (const auto& shape : shapes)
     {
         for (const auto& index : shape.mesh.indices)
@@ -93,10 +116,17 @@ int main()
                                attrib.texcoords[2 * index.texcoord_index + 1]};
             vertex.color    = {1.0f, 1.0f, 1.0f};
 
-            vertices.emplace_back(vertex);
-            indices.emplace_back(indices.size());
+            if (uniqueVertices.count(vertex) == 0)
+            {
+                uniqueVertices[vertex] = static_cast<unsigned int>(vertices.size());
+                vertices.emplace_back(vertex);
+            }
+            indices.emplace_back(uniqueVertices[vertex]);
         }
     }
+
+    std::cout << "Vertices size : " << vertices.size() << std::endl;
+    std::cout << "Indices size  : " << indices.size() << std::endl;
 
     unsigned int VBO, VAO, EBO;
     glGenVertexArrays(1, &VAO);
