@@ -6,6 +6,8 @@
 #define TINYOBJLOADER_IMPLEMENTATION
 #include <tiny_obj_loader.h>
 #include <iostream>
+#include <string>
+#include <vector>
 
 struct Vertex
 {
@@ -14,15 +16,9 @@ struct Vertex
     glm::vec2 texCoord;
 };
 
-std::vector<Vertex> vertices = {
-    // positions          // texture coords
-    {{0.5f, 0.5f, 0.0f}, {1.0f, 0.0f, 0.0f}, {1.0f, 1.0f}},    // top right
-    {{0.5f, -0.5f, 0.0f}, {1.0f, 0.0f, 0.0f}, {1.0f, 0.0f}},   // bottom right
-    {{-0.5f, -0.5f, 0.0f}, {1.0f, 0.0f, 0.0f}, {0.0f, 0.0f}},  // bottom left
-    {{-0.5f, 0.5f, 0.0f}, {1.0f, 0.0f, 0.0f}, {0.0f, 1.0f}}    // top left
-};
+std::vector<Vertex> vertices;
 
-std::vector<unsigned int> indices = {0, 1, 2, 2, 3, 0};
+std::vector<unsigned int> indices;
 
 int main()
 {
@@ -38,7 +34,7 @@ int main()
     glEnable(GL_TEXTURE_2D);
 
     sf::Image image;
-    if (!image.loadFromFile("resources/texture/texture.jpg"))
+    if (!image.loadFromFile("resources/texture/viking_room.png"))
     {
         std::cerr << "failed to load texture image" << std::endl;
         return -1;
@@ -72,6 +68,35 @@ int main()
     shader.setUniform("proj", sfProj);
 
     sf::Shader::bind(&shader);
+
+    // load model
+    tinyobj::attrib_t attrib;
+    std::vector<tinyobj::shape_t> shapes;
+    std::vector<tinyobj::material_t> materials;
+    std::string warn, err;
+
+    if (!tinyobj::LoadObj(&attrib, &shapes, &materials, &warn, &err, "resources/model/viking_room.obj"))
+    {
+        std::cerr << "failed to load obj" << std::endl;
+        return -1;
+    }
+
+    for (const auto& shape : shapes)
+    {
+        for (const auto& index : shape.mesh.indices)
+        {
+            Vertex vertex {};
+            vertex.position = {attrib.vertices[3 * index.vertex_index + 0],
+                               attrib.vertices[3 * index.vertex_index + 1],
+                               attrib.vertices[3 * index.vertex_index + 2]};
+            vertex.texCoord = {attrib.texcoords[2 * index.texcoord_index + 0],
+                               attrib.texcoords[2 * index.texcoord_index + 1]};
+            vertex.color    = {1.0f, 1.0f, 1.0f};
+
+            vertices.emplace_back(vertex);
+            indices.emplace_back(indices.size());
+        }
+    }
 
     unsigned int VBO, VAO, EBO;
     glGenVertexArrays(1, &VAO);
