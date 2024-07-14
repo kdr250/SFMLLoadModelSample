@@ -77,17 +77,6 @@ int main()
     }
     shader.setUniform("ourTexture", texture);
 
-    glm::mat4 model = glm::mat4(1.0f);
-    glm::mat4 view = glm::lookAt(glm::vec3(2.0f, 2.0f, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f));
-    glm::mat4 proj = glm::perspective(glm::radians(45.0f), window.getSize().x / (float)window.getSize().y, 0.1f, 10.0f);
-
-    sf::Glsl::Mat4 sfModel(glm::value_ptr(model));
-    sf::Glsl::Mat4 sfView(glm::value_ptr(view));
-    sf::Glsl::Mat4 sfProj(glm::value_ptr(proj));
-    shader.setUniform("model", sfModel);
-    shader.setUniform("view", sfView);
-    shader.setUniform("proj", sfProj);
-
     sf::Shader::bind(&shader);
 
     // load model
@@ -156,6 +145,7 @@ int main()
     glViewport(0.f, 0.f, 800.f, 600.f);
     glClearColor(0.f, 0.f, 0.f, 0.f);
 
+    sf::Clock time;
     while (window.isOpen())
     {
         sf::Event event;
@@ -166,6 +156,22 @@ int main()
                 window.close();
             }
         }
+
+        // update
+        glm::mat4 model = glm::rotate(glm::mat4(1.0f),
+                                      time.getElapsedTime().asSeconds() * glm::radians(90.0f),
+                                      glm::vec3(0.0f, 0.0f, 1.0f));
+        glm::mat4 view =
+            glm::lookAt(glm::vec3(2.0f, 2.0f, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+        glm::mat4 proj =
+            glm::perspective(glm::radians(45.0f), window.getSize().x / (float)window.getSize().y, 0.1f, 10.0f);
+
+        sf::Glsl::Mat4 sfModel(glm::value_ptr(model));
+        sf::Glsl::Mat4 sfView(glm::value_ptr(view));
+        sf::Glsl::Mat4 sfProj(glm::value_ptr(proj));
+        shader.setUniform("model", sfModel);
+        shader.setUniform("view", sfView);
+        shader.setUniform("proj", sfProj);
 
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
