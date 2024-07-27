@@ -11,6 +11,7 @@ find_package(SFML COMPONENTS system window graphics CONFIG REQUIRED)
 find_package(GLEW REQUIRED)
 find_package(glm CONFIG REQUIRED)
 find_package(tinyobjloader CONFIG REQUIRED)
+find_package(soil CONFIG REQUIRED)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED true)
@@ -28,10 +29,11 @@ add_executable(
 
 target_link_libraries(
 	SfmlWithCMake PRIVATE
-	sfml-system sfml-network sfml-graphics sfml-window sfml-main
+	sfml-system sfml-network sfml-graphics sfml-window
 	GLEW::GLEW
 	glm::glm
 	tinyobjloader::tinyobjloader
+	soil
 )
 
 add_custom_command(
