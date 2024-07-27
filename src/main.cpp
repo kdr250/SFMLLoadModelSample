@@ -1,12 +1,14 @@
 #include <GL/glew.h>
-#include <SFML/Graphics.hpp>
 #include <SFML/OpenGL.hpp>
+#include <SFML/Window.hpp>
 #define GLM_ENABLE_EXPERIMENTAL
+#include <SOIL/SOIL.h>
 #include <glm/glm.hpp>
 #include <glm/gtc/type_ptr.hpp>
 #include <glm/gtx/hash.hpp>
 #define TINYOBJLOADER_IMPLEMENTATION
 #include <tiny_obj_loader.h>
+#include <fstream>
 #include <iostream>
 #include <string>
 #include <unordered_map>
@@ -37,16 +39,135 @@ namespace std
     };
 }  // namespace std
 
-std::vector<Vertex> vertices;
+bool isCompiled(GLuint shader)
+{
+    GLint status;
+    glGetShaderiv(shader, GL_COMPILE_STATUS, &status);
+    if (status != GL_TRUE)
+    {
+        char buffer[512];
+        memset(buffer, 0, 512);
+        glGetShaderInfoLog(shader, 511, nullptr, buffer);
+        std::cout << "failed to compile GLSL: " << buffer << std::endl;
+        return false;
+    }
+    return true;
+}
 
-std::vector<unsigned int> indices;
+bool compileShader(const std::string& fileName, GLenum shaderType, GLuint& outShader)
+{
+    std::ifstream shaderFile(fileName);
+    if (!shaderFile.is_open())
+    {
+        std::cout << "Shader file not found: " << fileName << std::endl;
+        return false;
+    }
+
+    std::stringstream sstream;
+    sstream << shaderFile.rdbuf();
+    std::string contents     = sstream.str();
+    const char* contentsChar = contents.c_str();
+
+    outShader = glCreateShader(shaderType);
+
+    glShaderSource(outShader, 1, &contentsChar, nullptr);
+    glCompileShader(outShader);
+
+    if (!isCompiled(outShader))
+    {
+        std::cout << "failed to compile shader: " << fileName << std::endl;
+        return false;
+    }
+    return true;
+}
+
+bool isValidProgram(const GLuint& shaderProgram)
+{
+    GLint status;
+    glGetProgramiv(shaderProgram, GL_LINK_STATUS, &status);
+    if (status != GL_TRUE)
+    {
+        char buffer[512];
+        memset(buffer, 0, 512);
+        glGetProgramInfoLog(shaderProgram, 511, nullptr, buffer);
+        std::cout << "GLSL link status: " << buffer << std::endl;
+        return false;
+    }
+    return true;
+}
+
+bool loadShader(const std::string& vertName,
+                const std::string& fragName,
+                GLuint& shaderProgram,
+                GLuint& vertexId,
+                GLuint& fragId)
+{
+    // Compile vertex and pixel shaders
+    if (!compileShader(vertName, GL_VERTEX_SHADER, vertexId) || !compileShader(fragName, GL_FRAGMENT_SHADER, fragId))
+    {
+        return false;
+    }
+
+    // Now create a shader program that links together the vertex/frag shaders
+    shaderProgram = glCreateProgram();
+    glAttachShader(shaderProgram, vertexId);
+    glAttachShader(shaderProgram, fragId);
+    glLinkProgram(shaderProgram);
+
+    // Verify that the program linked successfully
+    if (!isValidProgram(shaderProgram))
+    {
+        return false;
+    }
+
+    return true;
+}
+
+bool loadTexture(const std::string& fileName, unsigned int& textureId)
+{
+    int width, height, channels = 0;
+    unsigned char* image = SOIL_load_image(fileName.c_str(), &width, &height, &channels, SOIL_LOAD_AUTO);
+    if (image == nullptr)
+    {
+        std::cout << "failed to load image: " << fileName << " " << SOIL_last_result() << std::endl;
+        return false;
+    }
+
+    int format = channels == 4 ? GL_RGBA : GL_RGB;
+
+    glGenTextures(1, &textureId);
+    glBindTexture(GL_TEXTURE_2D, textureId);
+
+    glTexImage2D(GL_TEXTURE_2D, 0, format, width, height, 0, format, GL_UNSIGNED_BYTE, image);
+
+    SOIL_free_image_data(image);
+
+    // Generate mipmap for texture
+    glGenerateMipmap(GL_TEXTURE_2D);
+    // Enable linear filtering
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+    // Enable anisotropic filtering, if supported
+    if (GLEW_EXT_texture_filter_anisotropic)
+    {
+        // Get the maximum anisotropy value
+        GLfloat largest;
+        glGetFloatv(GL_MAX_TEXTURE_MAX_ANISOTROPY_EXT, &largest);
+        // Enable it
+        glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAX_ANISOTROPY_EXT, largest);
+    }
+
+    return true;
+}
 
 int main()
 {
     sf::ContextSettings context;
     context.depthBits = 24;
 
-    sf::RenderWindow window(sf::VideoMode(800, 600), "Window", sf::Style::Default, context);
+    sf::Window window(sf::VideoMode(800, 600), "Window", sf::Style::Default, context);
+    window.setVerticalSyncEnabled(true);
     window.setActive(true);
 
     glewInit();
@@ -54,30 +175,11 @@ int main()
 
     glEnable(GL_TEXTURE_2D);
 
-    sf::Image image;
-    if (!image.loadFromFile("resources/texture/viking_room.png"))
-    {
-        std::cerr << "failed to load texture image" << std::endl;
-        return -1;
-    }
-    image.flipVertically();
+    GLuint shaderProgram, vertexId, fragId;
+    loadShader("resources/shader/vertex.vert", "resources/shader/fragment.frag", shaderProgram, vertexId, fragId);
 
-    sf::Texture texture;
-    if (!texture.loadFromImage(image))
-    {
-        std::cerr << "failed to load texture" << std::endl;
-        return -1;
-    }
-
-    sf::Shader shader;
-    if (!shader.loadFromFile("resources/shader/vertex.vert", "resources/shader/fragment.frag"))
-    {
-        std::cerr << "failed to load shaders" << std::endl;
-        return -1;
-    }
-    shader.setUniform("ourTexture", texture);
-
-    sf::Shader::bind(&shader);
+    unsigned int textureId;
+    loadTexture("resources/texture/viking_room.png", textureId);
 
     // load model
     tinyobj::attrib_t attrib;
@@ -91,6 +193,8 @@ int main()
         return -1;
     }
 
+    std::vector<Vertex> vertices;
+    std::vector<unsigned int> indices;
     std::unordered_map<Vertex, unsigned int> uniqueVertices;
 
     for (const auto& shape : shapes)
@@ -157,6 +261,8 @@ int main()
             }
         }
 
+        glUseProgram(shaderProgram);
+
         // update
         glm::mat4 model = glm::rotate(glm::mat4(1.0f),
                                       time.getElapsedTime().asSeconds() * glm::radians(90.0f),
@@ -166,16 +272,17 @@ int main()
         glm::mat4 proj =
             glm::perspective(glm::radians(45.0f), window.getSize().x / (float)window.getSize().y, 0.1f, 10.0f);
 
-        sf::Glsl::Mat4 sfModel(glm::value_ptr(model));
-        sf::Glsl::Mat4 sfView(glm::value_ptr(view));
-        sf::Glsl::Mat4 sfProj(glm::value_ptr(proj));
-        shader.setUniform("model", sfModel);
-        shader.setUniform("view", sfView);
-        shader.setUniform("proj", sfProj);
+        GLuint modelId = glGetUniformLocation(shaderProgram, "model");
+        glUniformMatrix4fv(modelId, 1, GL_FALSE, &model[0][0]);
+        GLuint viewId = glGetUniformLocation(shaderProgram, "view");
+        glUniformMatrix4fv(viewId, 1, GL_FALSE, &view[0][0]);
+        GLuint projId = glGetUniformLocation(shaderProgram, "proj");
+        glUniformMatrix4fv(projId, 1, GL_FALSE, &proj[0][0]);
 
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         // draw
+        glActiveTexture(GL_TEXTURE0);
         glBindVertexArray(VAO);
         glDrawElements(GL_TRIANGLES, static_cast<unsigned int>(indices.size()), GL_UNSIGNED_INT, 0);
         glBindVertexArray(0);
