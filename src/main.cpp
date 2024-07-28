@@ -164,7 +164,9 @@ bool loadTexture(const std::string& fileName, unsigned int& textureId)
 int main()
 {
     sf::ContextSettings context;
-    context.depthBits = 24;
+    context.depthBits    = 24;
+    context.majorVersion = 3;
+    context.minorVersion = 3;
 
     sf::Window window(sf::VideoMode(800, 600), "Window", sf::Style::Default, context);
     window.setVerticalSyncEnabled(true);

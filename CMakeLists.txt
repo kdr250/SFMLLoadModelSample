@@ -29,7 +29,7 @@ add_executable(
 
 target_link_libraries(
 	SfmlWithCMake PRIVATE
-	sfml-system sfml-network sfml-graphics sfml-window
+	sfml-system sfml-network sfml-window
 	GLEW::GLEW
 	glm::glm
 	tinyobjloader::tinyobjloader
