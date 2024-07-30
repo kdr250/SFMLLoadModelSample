@@ -13,5 +13,5 @@ out vec2 fragTexCoord;
 void main()
 {
     gl_Position = proj * view * model * vec4(position, 1.f);
-    fragTexCoord = texCoord;
+    fragTexCoord = vec2(texCoord.x, 1.0 - texCoord.y);
 }
